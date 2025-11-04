@@ -1,0 +1,44 @@
+# Ignorar el entorno virtual (venv)
+venv/
+.env
+.env.local
+
+# Archivos de caché de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos de configuración y logs
+*.log
+*.sqlite3
+instance/
+logs/
+*.pid
+
+# Configuración de VS Code
+.vscode/
+
+# Archivos de base de datos locales
+*.db
+*.sqlite
+*.sql
+
+# Archivos de dependencias y paquetes instalados
+Pipfile
+Pipfile.lock
+poetry.lock
+
+# Archivos de Docker (si usas Docker)
+.dockerignore
+docker-compose.yml
+
+# Node.js (si usas npm/yarn para frontend)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Archivos de FastAPI/Starlette de compilación
+*.egg-info/
+dist/
+build/
