@@ -13,3 +13,15 @@ pillow
 requests
 opencv-python
 moviepy
+requirements.txt
+
+fastapi
+uvicorn
+torch
+transformers
+opencv-python
+numpy
+librosa
+moviepy
+Pillow
+python-multipart
