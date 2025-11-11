@@ -9,3 +9,5 @@ class PredictResponse(BaseModel):
 
     class Config:
         from_attributes = True
+class PredictRequest(BaseModel):
+    image_url: str
