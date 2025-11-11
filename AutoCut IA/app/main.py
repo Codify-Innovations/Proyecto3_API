@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api.endpoints import dropdowns_endpoint, predict
+from app.api.endpoints import dropdowns_endpoint, predict,analyze
 from app.core.config import settings
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,6 +18,7 @@ app.add_middleware(
 
 app.include_router(predict.router, prefix="/api/predict", tags=["Predicción"])
 app.include_router(dropdowns_endpoint.router, prefix="/api/dropdowns", tags=["Dropdowns"])
+app.include_router(analyze.router, prefix="/api", tags=["Análisis Multimedia"])
 
 
 @app.get("/")
