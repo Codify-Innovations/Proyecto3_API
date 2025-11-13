@@ -50,3 +50,5 @@ build/
 *.engine
 *.bin
 *.xml
+
+temp_video_0.mp4

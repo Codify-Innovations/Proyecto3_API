@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, development, master ]
+  pull_request:
+    branches: [ main, development, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10", "3.11"]
+    
+    env:
+      GOOGLE_API_KEY: "fake-google-api-key-for-ci-testing"
+      CLOUDINARY_CLOUD_NAME: "fake-cloud-name"
+      CLOUDINARY_API_KEY: "123456789012345"
+      CLOUDINARY_API_SECRET: "fake-cloudinary-api-secret-for-ci"
+      CLOUDINARY_SECURE: "True"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('AutoCut IA/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg libsm6 libxext6
+
+    - name: Install Python dependencies
+      working-directory: ./AutoCut IA
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Verify imports
+      working-directory: ./AutoCut IA
+      run: |
+        python -c "import app.main; print('✅ Imports successful')"
+
+    - name: Check code syntax
+      working-directory: ./AutoCut IA
+      run: |
+        python -m py_compile app/main.py
+        find app -name "*.py" -exec python -m py_compile {} \;
+        echo "✅ Syntax check passed"
+
+    - name: Test FastAPI app initialization
+      working-directory: ./AutoCut IA
+      run: |
+        python -c "from app.main import app; print('✅ FastAPI app initialized successfully')"
+
