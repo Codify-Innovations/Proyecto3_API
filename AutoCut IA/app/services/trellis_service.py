@@ -1,7 +1,6 @@
 import sys
 import os
 
-# Agregar ruta donde está TRELLIS
 sys.path.append(os.path.abspath("../TRELLIS"))
 
 from trellis.pipelines import TrellisImageTo3DPipeline

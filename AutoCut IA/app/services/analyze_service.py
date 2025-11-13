@@ -1,4 +1,8 @@
-import cv2, numpy as np, librosa, tempfile, shutil, os
+import cv2
+import numpy as np
+import librosa
+import tempfile
+import os
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel
 import torch
@@ -8,15 +12,37 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
+def convert_types(obj):
+    if isinstance(obj, (np.float32, np.float64, np.int32, np.int64)):
+        return float(obj)
+    if isinstance(obj, dict):
+        return {k: convert_types(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [convert_types(v) for v in obj]
+    return obj
 
-def interpret_metric(value: float, ideal: float, warning: float) -> str:
+def interpret_metric(value, ideal, warning):
+    if value is None:
+        return "N/A"
     if value >= ideal:
         return "Excelente"
     elif value >= warning:
         return "Aceptable"
-    else:
-        return "Deficiente"
+    return "Deficiente"
 
+def clean(v):
+    if v is None:
+        return None
+    return round(float(v), 2)
+
+def build_response(tipo, score, quality_label, metrics, suggestions):
+    return convert_types({
+        "type": tipo,
+        "score": round(float(score), 2),
+        "quality_label": quality_label,
+        "metrics": metrics,
+        "suggestions": suggestions
+    })
 
 def analyze_image(path):
     image = Image.open(path).convert("RGB")
@@ -24,159 +50,168 @@ def analyze_image(path):
     height, width = np_img.shape[:2]
     gray = cv2.cvtColor(np_img, cv2.COLOR_RGB2GRAY)
 
-    brightness = np.mean(gray) / 255
-    contrast = gray.std() / 128
+    brightness = clean(np.mean(gray) / 255)
+    contrast = clean(gray.std() / 128)
     sharpness = cv2.Laplacian(gray, cv2.CV_64F).var()
-    sharpness_norm = min(sharpness / 1000, 1)
-    noise_level = np.var(cv2.GaussianBlur(gray, (3,3), 0) - gray) / 100  
+    sharpness_norm = clean(min(sharpness / 1000, 1))
 
     texts = [
-        "una imagen de alta calidad, bien iluminada y enfocada",
-        "una imagen borrosa o con poca luz",
-        "una foto de baja resolución",
-        "una fotografía profesional y nítida",
-        "una imagen sobreexpuesta o mal iluminada"
+        "imagen profesional",
+        "imagen borrosa",
+        "imagen bien iluminada",
+        "imagen mal iluminada"
     ]
     inputs = processor(text=texts, images=image, return_tensors="pt", padding=True).to(device)
     outputs = model(**inputs)
-    probs = outputs.logits_per_image.softmax(dim=1).detach().cpu().numpy()[0]
-    ia_score = probs[0] + probs[3] 
+    probs = outputs.logits_per_image.softmax(dim=1).cpu().detach().numpy()[0]
 
-    total_score = round(((brightness + contrast + sharpness_norm + ia_score) / 4) * 100, 2)
+    ia_value = clean(probs[0] + probs[2])
+    stability = clean(1.0)
 
-    metric_reference = {
+    score = ((brightness + contrast + sharpness_norm + ia_value) / 4) * 100
+
+    metrics = {
         "resolucion": f"{width}x{height}",
-        "iluminacion": {"valor": round(brightness, 2), "ideal": "≥ 0.75", "evaluacion": interpret_metric(brightness, 0.75, 0.4)},
-        "contraste": {"valor": round(contrast, 2), "ideal": "≥ 0.8", "evaluacion": interpret_metric(contrast, 0.8, 0.5)},
-        "nitidez": {"valor": round(sharpness_norm, 2), "ideal": "≥ 0.7", "evaluacion": interpret_metric(sharpness_norm, 0.7, 0.4)},
-        "ruido": {"valor": round(noise_level, 2), "ideal": "≤ 0.3", "evaluacion": "Buena" if noise_level < 0.3 else "Alta (ruidosa)"},
-        "ia_score": {"valor": round(float(ia_score), 2), "ideal": "≥ 0.8", "evaluacion": interpret_metric(ia_score, 0.8, 0.5)},
+        "iluminacion": {"valor": brightness, "evaluacion": interpret_metric(brightness, 0.75, 0.4)},
+        "contraste": {"valor": contrast, "evaluacion": interpret_metric(contrast, 0.8, 0.5)},
+        "nitidez": {"valor": sharpness_norm, "evaluacion": interpret_metric(sharpness_norm, 0.7, 0.4)},
+        "estabilidad": {"valor": stability, "evaluacion": "Excelente"},
+        "ia_score": {"valor": ia_value, "evaluacion": interpret_metric(ia_value, 0.8, 0.5)}
     }
 
     suggestions = []
     if brightness < 0.75:
-        suggestions.append("La iluminación es insuficiente. Usa luz natural o ajusta exposición.")
-    if contrast < 0.8:
-        suggestions.append("El contraste es bajo. Ajusta niveles o curvas para más profundidad.")
+        suggestions.append(
+            "La iluminación es baja; usar una fuente de luz más uniforme o grabar en un entorno más iluminado ayudará a que se capturen mejor los detalles de la imagen."
+        )
     if sharpness_norm < 0.7:
-        suggestions.append("La imagen está poco nítida. Verifica el enfoque o la cámara.")
-    if noise_level > 0.3:
-        suggestions.append("La imagen tiene ruido visible. Usa reducción de ruido o ISO más bajo.")
-    if ia_score < 0.8:
-        suggestions.append("No parece profesional. Mejora composición, luz o resolución.")
-    if not suggestions:
-        suggestions.append("La imagen tiene una calidad excelente, cercana al 100%. ¡Excelente trabajo!")
+        suggestions.append(
+            "La nitidez es limitada; mantener la cámara estable o asegurar un enfoque más preciso permitirá obtener una imagen más clara y definida."
+        )
+    if contrast < 0.5:
+        suggestions.append(
+            "El contraste es reducido; ajustar la exposición o mejorar las condiciones de luz facilitará una separación más clara entre zonas oscuras y claras."
+        )
+    if ia_value < 0.6:
+        suggestions.append(
+            "La IA detecta baja coherencia visual; mejorar iluminación y estabilidad puede ayudar a obtener resultados más precisos."
+        )
 
-    label = (
-        "Excelente calidad visual." if total_score > 85 else
-        "Buena calidad general." if total_score > 70 else
-        "Calidad media, requiere ajustes." if total_score > 50 else
-        "Baja calidad visual."
-    )
+    return build_response("image", score, "Evaluación visual completa", metrics, suggestions)
 
-    return {
-        "type": "image",
-        "score": total_score,
-        "quality_label": label,
-        "metrics": metric_reference,
-        "suggestions": suggestions
+def analyze_audio(path):
+    y, sr = librosa.load(path, sr=None)
+
+    rms = clean(np.mean(librosa.feature.rms(y=y)))
+    zcr = clean(np.mean(librosa.feature.zero_crossing_rate(y)))
+    centroid = clean(np.mean(librosa.feature.spectral_centroid(y=y, sr=sr)))
+
+    claridad = clean(1 - zcr)
+    ruido = clean(1 - rms)
+    balance = clean(min(centroid / 5000, 1))
+
+    audio_score = clean((claridad + (1 - ruido) + balance) / 3)
+
+    metrics = {
+        "claridad": {"valor": claridad, "evaluacion": interpret_metric(claridad, 0.8, 0.5)},
+        "ruido": {"valor": ruido, "evaluacion": interpret_metric(ruido, 0.7, 0.4)},
+        "balance": {"valor": balance, "evaluacion": interpret_metric(balance, 0.75, 0.5)},
+        "audio_score": {"valor": audio_score, "evaluacion": interpret_metric(audio_score, 0.8, 0.5)}
     }
 
+    suggestions = []
+    if claridad < 0.7:
+        suggestions.append(
+            "El audio presenta baja claridad; hablar más cerca del micrófono o grabar en un espacio con menos eco mejorará la definición sonora."
+        )
+    if ruido > 0.4:
+        suggestions.append(
+            "Se detecta ruido de fondo; grabar en un entorno más silencioso o aplicar reducción de ruido mejorará la limpieza del audio."
+        )
+    if balance < 0.5:
+        suggestions.append(
+            "El balance de frecuencias no es uniforme; ajustar graves y agudos permitirá obtener un sonido más equilibrado."
+        )
+
+    return {"metrics": metrics, "score": audio_score * 100, "suggestions": suggestions}
 
 def analyze_video(path):
     cap = cv2.VideoCapture(path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    fps = clean(cap.get(cv2.CAP_PROP_FPS))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    frame_ids = np.linspace(0, total_frames - 1, num=min(60, total_frames)).astype(int)
-    brightness_list, stability_list = [], []
+    frame_ids = np.linspace(0, total_frames - 1, num=min(30, total_frames)).astype(int)
+
+    brightness_list = []
+    stability_list = []
     prev_gray = None
 
     for fid in frame_ids:
         cap.set(cv2.CAP_PROP_POS_FRAMES, fid)
         ret, frame = cap.read()
-        if not ret:
-            continue
+        if not ret: continue
+
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        brightness_list.append(np.mean(gray) / 255)
+        brightness_list.append(clean(np.mean(gray) / 255))
+
         if prev_gray is not None:
-            flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-            motion = np.mean(np.sqrt(flow[...,0]**2 + flow[...,1]**2))
-            stability_list.append(1 - min(motion / 10, 1))
+            flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None,
+                                                0.5, 3, 15, 3, 5, 1.2, 0)
+            motion = np.mean(np.sqrt(flow[..., 0] ** 2 + flow[..., 1] ** 2))
+            stability_list.append(clean(1 - min(motion / 10, 1)))
+
         prev_gray = gray
 
     cap.release()
 
-    brightness = np.mean(brightness_list) if brightness_list else 0.5
-    stability = np.mean(stability_list) if stability_list else 0.5
-    fluidez = min(fps / 30, 1)
-    resolution = min((width * height) / (1920 * 1080), 1)
-    score_visual = (brightness + stability + fluidez + resolution) / 4
+    brightness = clean(np.mean(brightness_list))
+    stability = clean(np.mean(stability_list))
+    fluidez = clean(min(fps / 30, 1))
 
-    total_score = round(score_visual * 100, 2)
+    audio_metrics = {}
+    audio_score = 0.6
 
-    metric_reference = {
+    try:
+        with mp.VideoFileClip(path) as clip:
+            if clip.audio:
+                audio_path = tempfile.mktemp(suffix=".wav")
+                clip.audio.write_audiofile(audio_path, logger=None)
+                audio_data = analyze_audio(audio_path)
+                audio_metrics = audio_data["metrics"]
+                audio_score = clean(audio_data["score"] / 100)
+                os.remove(audio_path)
+    except:
+        pass
+
+    final_score = ((brightness + stability + fluidez) / 3 * 0.6 + audio_score * 0.4) * 100
+
+    metrics = {
         "resolucion": f"{width}x{height}",
-        "fps": round(fps, 1),
-        "iluminacion": {"valor": round(brightness, 2), "ideal": "≥ 0.75", "evaluacion": interpret_metric(brightness, 0.75, 0.4)},
-        "estabilidad": {"valor": round(stability, 2), "ideal": "≥ 0.7", "evaluacion": interpret_metric(stability, 0.7, 0.5)},
-        "fluidez": {"valor": round(fluidez, 2), "ideal": "≥ 0.9", "evaluacion": interpret_metric(fluidez, 0.9, 0.7)},
+        "iluminacion": {"valor": brightness, "evaluacion": interpret_metric(brightness, 0.75, 0.4)},
+        "estabilidad": {"valor": stability, "evaluacion": interpret_metric(stability, 0.7, 0.5)},
+        "fps": fps,
+        "fluidez": {"valor": fluidez, "evaluacion": interpret_metric(fluidez, 0.9, 0.7)},
+        **audio_metrics
     }
 
     suggestions = []
     if brightness < 0.75:
-        suggestions.append("Aumenta la iluminación para una mejor exposición.")
+        suggestions.append(
+            "El video tiene iluminación limitada; grabar con una fuente de luz más fuerte o más cercana ayuda a mejorar la claridad visual."
+        )
     if stability < 0.7:
-        suggestions.append("Reduce vibraciones usando trípode o estabilizador.")
+        suggestions.append(
+            "Se detecta movimiento entre cuadros; usar un trípode o apoyar la cámara permitirá obtener un video más estable."
+        )
     if fluidez < 0.9:
-        suggestions.append("Graba a más FPS para una reproducción fluida.")
-    if not suggestions:
-        suggestions.append("El video cumple con todos los parámetros de alta calidad. ¡Excelente trabajo!")
+        suggestions.append(
+            "La fluidez del video es baja; grabar a más FPS generará un movimiento más suave y natural."
+        )
+    if audio_score < 0.7:
+        suggestions.append(
+            "El audio del video puede mejorarse; grabar en un entorno silencioso o usar un micrófono externo incrementará la calidad final."
+        )
 
-    label = (
-        "Excelente calidad audiovisual." if total_score > 85 else
-        "Buena calidad general." if total_score > 70 else
-        "Calidad media." if total_score > 50 else
-        "Baja calidad audiovisual."
-    )
-
-    return {"type": "video", "score": total_score, "quality_label": label, "metrics": metric_reference, "suggestions": suggestions}
-
-
-def analyze_audio(path):
-    y, sr = librosa.load(path, sr=None)
-    rms = np.mean(librosa.feature.rms(y=y))
-    zcr = np.mean(librosa.feature.zero_crossing_rate(y))
-    spec_centroid = np.mean(librosa.feature.spectral_centroid(y=y, sr=sr))
-
-    claridad = 1 - zcr
-    balance = min(spec_centroid / 5000, 1)
-    ruido = max(0, min(1, 1 - rms))
-    score = round(((claridad + (1 - ruido) + balance) / 3) * 100, 2)
-
-    metric_reference = {
-        "claridad": {"valor": round(claridad, 2), "ideal": "≥ 0.8", "evaluacion": interpret_metric(claridad, 0.8, 0.5)},
-        "ruido": {"valor": round(ruido, 2), "ideal": "≤ 0.4", "evaluacion": "Buena" if ruido < 0.4 else "Alta (ruidosa)"},
-        "balance": {"valor": round(balance, 2), "ideal": "≥ 0.75", "evaluacion": interpret_metric(balance, 0.75, 0.5)},
-    }
-
-    suggestions = []
-    if claridad < 0.8:
-        suggestions.append("Aumenta la claridad evitando distorsión o ecos.")
-    if ruido > 0.4:
-        suggestions.append("Reduce el ruido de fondo o usa un micrófono aislado.")
-    if balance < 0.75:
-        suggestions.append("Ajusta el balance de frecuencias para un sonido más natural.")
-    if not suggestions:
-        suggestions.append("El audio presenta una calidad excelente, cercana al 100%.")
-
-    label = (
-        "Audio excelente." if score > 85 else
-        "Audio bueno con margen de mejora." if score > 70 else
-        "Audio aceptable con ruido." if score > 50 else
-        "Audio deficiente."
-    )
-
-    return {"type": "audio", "score": score, "quality_label": label, "metrics": metric_reference, "suggestions": suggestions}
+    return build_response("video", final_score, "Evaluación audiovisual completa", metrics, suggestions)
