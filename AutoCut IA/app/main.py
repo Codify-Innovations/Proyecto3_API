@@ -1,7 +1,12 @@
 import os
 import sys
 import multiprocessing
-
+from fastapi import FastAPI
+from app.api.endpoints import analyze,vehicle_identificacion
+from fastapi.middleware.cors import CORSMiddleware
+from app.api.endpoints import video_generator
+from app.core.config import settings
+import cloudinary
 # ============================================================
 # 🧩 FIX: Cargar entorno virtual (.venv) correctamente
 # ============================================================
@@ -20,11 +25,6 @@ print(f"✅ Librerías cargadas desde entorno virtual: {venv_path}")
 # ============================================================
 # 🚀 CONFIGURACIÓN FASTAPI
 # ============================================================
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints import predict, video_generator
-from app.core.config import settings
-import cloudinary
 
 # Evita errores en Windows con multiprocessing
 multiprocessing.freeze_support()
@@ -50,7 +50,7 @@ cloudinary.config(
 # ============================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # puedes restringir luego a dominios específicos
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,25 +59,10 @@ app.add_middleware(
 # ============================================================
 # 🔗 RUTAS PRINCIPALES
 # ============================================================
-app.include_router(predict.router, prefix="/api/predict", tags=["Predicción"])
 app.include_router(video_generator.router, prefix="/api/video", tags=["Generador de Video"])
-from app.api.endpoints import predict, analyze
-from app.core.config import settings
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(predict.router, prefix="/api/predict", tags=["Predicción"])
 app.include_router(analyze.router, prefix="/api", tags=["Análisis Multimedia"])
+app.include_router(vehicle_identificacion.router, prefix="/api/vehicle_identification", tags=["Vehicle Identification"])
+app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
 
 
 # ============================================================
