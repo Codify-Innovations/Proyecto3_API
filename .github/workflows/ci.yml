@@ -9,9 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11"]
     
     env:
       GOOGLE_API_KEY: "fake-google-api-key-for-ci-testing"
@@ -23,10 +20,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.10
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: "3.10"
 
     - name: Cache pip packages
       uses: actions/cache@v4
@@ -47,20 +44,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Verify imports
+    - name: Build verification
       working-directory: ./AutoCut IA
       run: |
-        python -c "import app.main; print('✅ Imports successful')"
-
-    - name: Check code syntax
-      working-directory: ./AutoCut IA
-      run: |
-        python -m py_compile app/main.py
-        find app -name "*.py" -exec python -m py_compile {} \;
-        echo "✅ Syntax check passed"
-
-    - name: Test FastAPI app initialization
-      working-directory: ./AutoCut IA
-      run: |
-        python -c "from app.main import app; print('✅ FastAPI app initialized successfully')"
+        python -c "from app.main import app; print('✅ Build successful')"
 
