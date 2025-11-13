@@ -62,7 +62,6 @@ app.add_middleware(
 app.include_router(video_generator.router, prefix="/api/video", tags=["Generador de Video"])
 app.include_router(analyze.router, prefix="/api", tags=["Análisis Multimedia"])
 app.include_router(vehicle_identificacion.router, prefix="/api/vehicle_identification", tags=["Vehicle Identification"])
-app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
 
 
 # ============================================================
