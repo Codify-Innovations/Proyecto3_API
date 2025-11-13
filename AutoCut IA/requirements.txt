@@ -1,3 +1,18 @@
+fastapi
+uvicorn
+pandas
+openpyxl
+numpy
+transformers
+diffusers
+accelerate
+torch
+torchvision
+torchaudio
+pillow
+requests
+opencv-python
+moviepy
 requirements.txt
 
 fastapi
