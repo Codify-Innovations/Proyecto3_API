@@ -1,7 +1,8 @@
 from fastapi import APIRouter
-from app.api.endpoints import predict
+from app.api.endpoints import video_generator
+
 
 api_router = APIRouter()
 
 # Prefijos y tags por módulo
-api_router.include_router(predict.router, prefix="/api/predict", tags=["Predicción"])
+api_router.include_router(video_generator.router, tags=["Video Generator"])
