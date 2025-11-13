@@ -1,14 +1,76 @@
+import os
+import sys
+import multiprocessing
 from fastapi import FastAPI
+from app.api.endpoints import analyze,vehicle_identificacion
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints.analyze import router as analyze_router
+from app.api.endpoints import video_generator
+from app.core.config import settings
+import cloudinary
+# ============================================================
+# 🧩 FIX: Cargar entorno virtual (.venv) correctamente
+# ============================================================
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+venv_path = os.path.join(project_root, ".venv", "Lib", "site-packages")
 
-app = FastAPI(title="AutoCut Multimedia Quality AI")
+if not os.path.exists(venv_path):
+    # Si no está al mismo nivel, sube un nivel adicional (por seguridad)
+    venv_path = os.path.abspath(os.path.join(project_root, "..", ".venv", "Lib", "site-packages"))
 
+if venv_path not in sys.path:
+    sys.path.insert(0, venv_path)
+
+print(f"✅ Librerías cargadas desde entorno virtual: {venv_path}")
+
+# ============================================================
+# 🚀 CONFIGURACIÓN FASTAPI
+# ============================================================
+
+# Evita errores en Windows con multiprocessing
+multiprocessing.freeze_support()
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.VERSION,
+    description="🎬 Microservicio IA de AutoCut: Predicción e IA de generación de video"
+)
+
+# ============================================================
+# ☁️ CONFIGURACIÓN CLOUDINARY
+# ============================================================
+cloudinary.config(
+    cloud_name="dzejxb251",
+    api_key="772823312336243",
+    api_secret="6SXovJsGxxNjgWaWADkT01kHIB8",
+    secure=True,
+)
+
+# ============================================================
+# 🔒 MIDDLEWARE CORS
+# ============================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(analyze_router, prefix="/api", tags=["Media Analysis"])
+# ============================================================
+# 🔗 RUTAS PRINCIPALES
+# ============================================================
+app.include_router(video_generator.router, prefix="/api/video", tags=["Generador de Video"])
+app.include_router(analyze.router, prefix="/api", tags=["Análisis Multimedia"])
+app.include_router(vehicle_identificacion.router, prefix="/api/vehicle_identification", tags=["Vehicle Identification"])
+
+
+# ============================================================
+# 🏠 ENDPOINT DE PRUEBA
+# ============================================================
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "message": "🚗 AutoCut IA API funcionando correctamente 🚀",
+        "endpoints": ["/api/predict", "/api/video"],
+    }
