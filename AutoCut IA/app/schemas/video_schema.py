@@ -1,7 +1,9 @@
+from typing import List, Optional
 from pydantic import BaseModel
-from typing import List
 
 class VideoRequest(BaseModel):
     image_urls: List[str]
-    duration: int = 3
-    style: str = "cinematic"
+    video_urls: List[str]
+    style: str
+    duration: int
+    music_url: Optional[str] = None

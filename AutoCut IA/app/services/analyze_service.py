@@ -35,6 +35,15 @@ def clean(v):
         return None
     return round(float(v), 2)
 
+
+
+def boost(v):
+    if v is None:
+        return 0
+    return min(1, v * 0.5 + 0.55)  
+
+
+
 def build_response(tipo, score, quality_label, metrics, suggestions):
     return convert_types({
         "type": tipo,
@@ -68,7 +77,13 @@ def analyze_image(path):
     ia_value = clean(probs[0] + probs[2])
     stability = clean(1.0)
 
-    score = ((brightness + contrast + sharpness_norm + ia_value) / 4) * 100
+    b_brightness = boost(brightness)
+    b_contrast = boost(contrast)
+    b_sharpness = boost(sharpness_norm)
+    b_ia = boost(ia_value)
+
+    score = ((b_brightness + b_contrast + b_sharpness + b_ia) / 4) * 100
+    score = round(score, 2)
 
     metrics = {
         "resolucion": f"{width}x{height}",
@@ -81,21 +96,13 @@ def analyze_image(path):
 
     suggestions = []
     if brightness < 0.75:
-        suggestions.append(
-            "La iluminación es baja; usar una fuente de luz más uniforme o grabar en un entorno más iluminado ayudará a que se capturen mejor los detalles de la imagen."
-        )
+        suggestions.append("La iluminación es baja; usar una fuente de luz más uniforme o grabar en un entorno más iluminado ayudará a que se capturen mejor los detalles de la imagen.")
     if sharpness_norm < 0.7:
-        suggestions.append(
-            "La nitidez es limitada; mantener la cámara estable o asegurar un enfoque más preciso permitirá obtener una imagen más clara y definida."
-        )
+        suggestions.append("La nitidez es limitada; mantener la cámara estable o asegurar un enfoque más preciso permitirá obtener una imagen más clara y definida.")
     if contrast < 0.5:
-        suggestions.append(
-            "El contraste es reducido; ajustar la exposición o mejorar las condiciones de luz facilitará una separación más clara entre zonas oscuras y claras."
-        )
+        suggestions.append("El contraste es reducido; ajustar la exposición o mejorar las condiciones de luz facilitará una separación más clara entre zonas oscuras y claras.")
     if ia_value < 0.6:
-        suggestions.append(
-            "La IA detecta baja coherencia visual; mejorar iluminación y estabilidad puede ayudar a obtener resultados más precisos."
-        )
+        suggestions.append("La IA detecta baja coherencia visual; mejorar iluminación y estabilidad puede ayudar a obtener resultados más precisos.")
 
     return build_response("image", score, "Evaluación visual completa", metrics, suggestions)
 
@@ -110,30 +117,29 @@ def analyze_audio(path):
     ruido = clean(1 - rms)
     balance = clean(min(centroid / 5000, 1))
 
-    audio_score = clean((claridad + (1 - ruido) + balance) / 3)
+    b_claridad = boost(claridad)
+    b_ruido = boost(1 - ruido)
+    b_balance = boost(balance)
+
+    audio_score = ((b_claridad + b_ruido + b_balance) / 3) * 100
+    audio_score = round(audio_score, 2)
 
     metrics = {
         "claridad": {"valor": claridad, "evaluacion": interpret_metric(claridad, 0.8, 0.5)},
         "ruido": {"valor": ruido, "evaluacion": interpret_metric(ruido, 0.7, 0.4)},
         "balance": {"valor": balance, "evaluacion": interpret_metric(balance, 0.75, 0.5)},
-        "audio_score": {"valor": audio_score, "evaluacion": interpret_metric(audio_score, 0.8, 0.5)}
+        "audio_score": {"valor": audio_score, "evaluacion": interpret_metric(audio_score/100, 0.8, 0.5)}
     }
 
     suggestions = []
     if claridad < 0.7:
-        suggestions.append(
-            "El audio presenta baja claridad; hablar más cerca del micrófono o grabar en un espacio con menos eco mejorará la definición sonora."
-        )
+        suggestions.append("El audio presenta baja claridad; hablar más cerca del micrófono o grabar en un espacio con menos eco mejorará la definición sonora.")
     if ruido > 0.4:
-        suggestions.append(
-            "Se detecta ruido de fondo; grabar en un entorno más silencioso o aplicar reducción de ruido mejorará la limpieza del audio."
-        )
+        suggestions.append("Se detecta ruido de fondo; grabar en un entorno más silencioso o aplicar reducción de ruido mejorará la limpieza del audio.")
     if balance < 0.5:
-        suggestions.append(
-            "El balance de frecuencias no es uniforme; ajustar graves y agudos permitirá obtener un sonido más equilibrado."
-        )
+        suggestions.append("El balance de frecuencias no es uniforme; ajustar graves y agudos permitirá obtener un sonido más equilibrado.")
 
-    return {"metrics": metrics, "score": audio_score * 100, "suggestions": suggestions}
+    return {"metrics": metrics, "score": audio_score, "suggestions": suggestions}
 
 def analyze_video(path):
     cap = cv2.VideoCapture(path)
@@ -185,7 +191,12 @@ def analyze_video(path):
     except:
         pass
 
-    final_score = ((brightness + stability + fluidez) / 3 * 0.6 + audio_score * 0.4) * 100
+    b_brightness = boost(brightness)
+    b_stability = boost(stability)
+    b_fluidez = boost(fluidez)
+
+    final_score = ((b_brightness + b_stability + b_fluidez) / 3 * 0.6 + audio_score * 0.4) * 100
+    final_score = round(final_score, 2)
 
     metrics = {
         "resolucion": f"{width}x{height}",
@@ -198,20 +209,12 @@ def analyze_video(path):
 
     suggestions = []
     if brightness < 0.75:
-        suggestions.append(
-            "El video tiene iluminación limitada; grabar con una fuente de luz más fuerte o más cercana ayuda a mejorar la claridad visual."
-        )
+        suggestions.append("El video tiene iluminación limitada; grabar con una fuente de luz más fuerte o más cercana ayuda a mejorar la claridad visual.")
     if stability < 0.7:
-        suggestions.append(
-            "Se detecta movimiento entre cuadros; usar un trípode o apoyar la cámara permitirá obtener un video más estable."
-        )
+        suggestions.append("Se detecta movimiento entre cuadros; usar un trípode o apoyar la cámara permitirá obtener un video más estable.")
     if fluidez < 0.9:
-        suggestions.append(
-            "La fluidez del video es baja; grabar a más FPS generará un movimiento más suave y natural."
-        )
+        suggestions.append("La fluidez del video es baja; grabar a más FPS generará un movimiento más suave y natural.")
     if audio_score < 0.7:
-        suggestions.append(
-            "El audio del video puede mejorarse; grabar en un entorno silencioso o usar un micrófono externo incrementará la calidad final."
-        )
+        suggestions.append("El audio del video puede mejorarse; grabar en un entorno silencioso o usar un micrófono externo incrementará la calidad final.")
 
     return build_response("video", final_score, "Evaluación audiovisual completa", metrics, suggestions)
