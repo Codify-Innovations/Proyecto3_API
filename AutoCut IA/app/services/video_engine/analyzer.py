@@ -43,6 +43,6 @@ def analyze_style(style: str):
         },
     }
 
-    preset = presets.get(style, presets["showcase"])
+    preset = presets.get(style, presets["cinematic"])
     debug(f"[STYLE] preset aplicado '{style}': {preset}")
     return preset
