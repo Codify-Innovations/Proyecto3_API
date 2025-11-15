@@ -9,7 +9,6 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 venv_path = os.path.join(project_root, ".venv", "Lib", "site-packages")
 
 if not os.path.exists(venv_path):
-    # Si no está al mismo nivel, sube un nivel adicional (por seguridad)
     venv_path = os.path.abspath(os.path.join(project_root, "..", ".venv", "Lib", "site-packages"))
 
 if venv_path not in sys.path:
@@ -22,17 +21,23 @@ print(f"✅ Librerías cargadas desde entorno virtual: {venv_path}")
 # ============================================================
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.endpoints import predict, video_generator
-from app.core.config import settings
 import cloudinary
 
-# Evita errores en Windows con multiprocessing
+# Routers originales (correctos)
+from app.api.endpoints.predict import router as predict_router
+from app.api.endpoints.video_generator import router as video_router
+
+# Router de análisis multimedia (el que tus compañeros usan)
+from app.api.endpoints.analyze import router as analyze_router
+
+from app.core.config import settings
+
 multiprocessing.freeze_support()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="🎬 Microservicio IA de AutoCut: Predicción e IA de generación de video"
+    description="🎬 Microservicio IA de AutoCut: Predicción, Análisis y Generación de Video"
 )
 
 # ============================================================
@@ -46,39 +51,25 @@ cloudinary.config(
 )
 
 # ============================================================
-# 🔒 MIDDLEWARE CORS
+# 🔒 MIDDLEWARE CORS (solo una vez)
 # ============================================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # puedes restringir luego a dominios específicos
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ============================================================
-# 🔗 RUTAS PRINCIPALES
+# 🔗 RUTAS PRINCIPALES (ya sin duplicación)
 # ============================================================
-app.include_router(predict.router, prefix="/api/predict", tags=["Predicción"])
-app.include_router(video_generator.router, prefix="/api/video", tags=["Generador de Video"])
-from app.api.endpoints import predict, analyze
-from app.core.config import settings
-from fastapi.middleware.cors import CORSMiddleware
+# Rutas ORIGINALMENTE usadas por tu equipo
+app.include_router(predict_router, prefix="/api/predict", tags=["Predicción"])
+app.include_router(analyze_router, prefix="/api", tags=["Análisis Multimedia"])
 
-app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
-
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(predict.router, prefix="/api/predict", tags=["Predicción"])
-app.include_router(analyze.router, prefix="/api", tags=["Análisis Multimedia"])
-
+# RUTA que tú necesitas para el generador de video IA
+app.include_router(video_router, prefix="/api/video", tags=["Generador de Video"])
 
 # ============================================================
 # 🏠 ENDPOINT DE PRUEBA
@@ -88,5 +79,9 @@ def root():
     return {
         "status": "ok",
         "message": "🚗 AutoCut IA API funcionando correctamente 🚀",
-        "endpoints": ["/api/predict", "/api/video"],
+        "endpoints": [
+            "/api/predict",
+            "/api/video",
+            "/api"
+        ],
     }
