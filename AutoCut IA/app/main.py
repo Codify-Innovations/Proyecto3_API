@@ -24,7 +24,7 @@ multiprocessing.freeze_support()
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="🎬 Microservicio IA de AutoCut: Predicción e IA de generación de video"
+    description="🎬 Microservicio IA de AutoCut: Predicción, Análisis y Generación de Video"
 )
 
 cloudinary.config(
@@ -51,5 +51,9 @@ def root():
     return {
         "status": "ok",
         "message": "🚗 AutoCut IA API funcionando correctamente 🚀",
-        "endpoints": ["/api/predict", "/api/video"],
+        "endpoints": [
+            "/api/predict",
+            "/api/video",
+            "/api"
+        ],
     }
