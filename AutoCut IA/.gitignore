@@ -42,3 +42,13 @@ yarn.lock
 *.egg-info/
 dist/
 build/
+
+# Modelos YOLO
+*.pt
+*.onnx
+*.tflite
+*.engine
+*.bin
+*.xml
+
+temp_video_0.mp4
