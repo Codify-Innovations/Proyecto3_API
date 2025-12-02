@@ -2,9 +2,14 @@ from ultralytics import YOLO
 from PIL import Image
 import torch
 import os
+import logging
 from datetime import datetime
 
-print("🔍 Cargando modelo YOLOv8 para detección de autos...")
+logger = logging.getLogger(__name__)
+
+
+
+logger.info("Cargando modelo YOLOv8 para detección de autos...")
 yolo_model = YOLO("yolov8x.pt")
 
 CROPS_DIR = os.path.join("app", "static", "crops")
@@ -17,6 +22,7 @@ def detectar_auto(image: Image.Image):
     devuelve el recorte (PIL.Image) y guarda una copia en disco.
     """
     try:
+        logger.debug("Ejecutando modelo YOLOv8 sobre la imagen.")
         results = yolo_model(image, verbose=False)
         detections = results[0].boxes
 
@@ -24,10 +30,14 @@ def detectar_auto(image: Image.Image):
         for box in detections:
             cls = int(box.cls[0])
             label = results[0].names[cls]
+            logger.debug(f"Objeto detectado: {label}")
+
             if label in ["car", "truck", "bus", "motorbike"]:
+                logger.debug(f"Vehículo identificado: {label}")
                 car_boxes.append(box.xyxy[0])
 
         if not car_boxes:
+            logger.warning("No se detectó ningún vehículo en la imagen.")
             raise ValueError("No se detectó ningún vehículo en la imagen.")
 
         areas = [(b[2] - b[0]) * (b[3] - b[1]) for b in car_boxes]
@@ -45,5 +55,5 @@ def detectar_auto(image: Image.Image):
         return cropped_image
 
     except Exception as e:
-        print(f"❌ Error al detectar o guardar el vehículo: {str(e)}")
+        logger.error(f"❌ Error en detección YOLO: {str(e)}", exc_info=True)
         raise

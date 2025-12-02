@@ -1,19 +1,17 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, Depends
 from fastapi.responses import JSONResponse
 import tempfile, shutil, os
 
 from app.services.analyze_service import analyze_image, analyze_video, analyze_audio
+from app.api.dependencies import validate_file_size
 
 router = APIRouter()
 
 @router.post("/analyze")
-async def analyze(file: UploadFile = File(...)):
+async def analyze(file: UploadFile = Depends(validate_file_size)):
 
     if not file:
         return JSONResponse(status_code=400, content={"status": "error", "message": "No se envió ningún archivo."})
-
-    if file.size and file.size > 50 * 1024 * 1024:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "El archivo excede 50 MB."})
 
     if not any(t in file.content_type for t in ["image", "video", "audio"]):
         return JSONResponse(status_code=400, content={"status": "error", "message": "Formato no soportado."})

@@ -5,26 +5,20 @@ import requests
 import os
 import json
 from app.core.config import settings
-
+import logging
 
 class GeminiService:
+
+    logger = logging.getLogger(__name__)
+
     def __init__(self):
         if not settings.GOOGLE_API_KEY:
-            raise ValueError("⚠️ Falta GOOGLE_API_KEY en el archivo .env o variables de entorno.")
+            self.logger.error("GOOGLE_API_KEY no está configurada.")
+            raise ValueError("Falta GOOGLE_API_KEY en el archivo .env o variables de entorno.")
+        self.logger.info("Inicializando cliente de Gemini con la API Key configurada.")
         self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
 
     def identify_vehicle(self, image_url: str):
-        """
-        Identifica marca, modelo, año y color aproximado de un vehículo
-        a partir de una imagen usando el modelo  gemini-2.0-flash.
-        """
-        # prompt = (
-        #     "You are an automotive identification expert. "
-        #     "Analyze the provided car image and return ONLY a valid JSON object with the following keys: "
-        #     "`brand`, `model`, `year`, and `color`. "
-        #     "The color should be the dominant visible color of the car's body. "
-        #     "Return only the JSON object, without markdown or text outside the JSON."
-        # )
         prompt = (
             "You are an expert automotive analyst. "
             "Analyze the provided car image and return ONLY a valid JSON object "
@@ -56,13 +50,13 @@ class GeminiService:
 
             try:
                 data = json.loads(text)
+                self.logger.info("JSON válido recibido desde Gemini.")
             except json.JSONDecodeError:
-                print("⚠️ No se pudo parsear JSON, respuesta cruda:", text)
+                self.logger.warning("El modelo devolvió texto no JSON. Devolviendo raw_response.")
                 data = {"raw_response": text}
-
-            print("✅ Resultado IA:", data)
+            self.logger.info(f"Resultado analisis de IA: {data}")
             return data
 
         except Exception as e:
-            print(f"❌ Error al analizar vehículo con Gemini: {e}")
+            self.logger.exception("Error inesperado durante la identificación del vehículo.")
             return {"error": str(e)}

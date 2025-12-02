@@ -6,6 +6,7 @@ from app.api.endpoints import analyze,vehicle_identificacion
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints import video_generator
 from app.core.config import settings
+from app.core.logging_config import *
 import cloudinary
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
