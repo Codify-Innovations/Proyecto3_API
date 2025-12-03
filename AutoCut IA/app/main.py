@@ -2,7 +2,7 @@ import os
 import sys
 import multiprocessing
 from fastapi import FastAPI
-from app.api.endpoints import analyze,vehicle_identificacion
+from app.api.endpoints import analyze,vehicle_identificacion,gemini_analyze
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints import video_generator
 from app.core.config import settings
@@ -46,12 +46,13 @@ app.add_middleware(
 app.include_router(video_generator.router, prefix="/api/video", tags=["Generador de Video"])
 app.include_router(analyze.router, prefix="/api", tags=["Análisis Multimedia"])
 app.include_router(vehicle_identificacion.router, prefix="/api/vehicle_identification", tags=["Vehicle Identification"])
+app.include_router(gemini_analyze.router, prefix="/api/gemini", tags=["Gemini Analyze"])
 
 @app.get("/")
 def root():
     return {
         "status": "ok",
-        "message": "🚗 AutoCut IA API funcionando correctamente 🚀",
+        "message": "AutoCut IA API funcionando correctamente",
         "endpoints": [
             "/api/predict",
             "/api/video",
